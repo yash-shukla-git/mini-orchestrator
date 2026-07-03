@@ -1,0 +1,9 @@
+{
+  "name": "mini-orchestrator",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev:core": "tsx watch packages/core",
+    "dev:worker": "tsx watch packages/worker"
+  }
+}

@@ -1,0 +1,50 @@
+services:
+  core:
+    build:
+      context: .
+      dockerfile: packages/core/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      MONGODB_URI: ${MONGODB_URI}
+      PORT: 3000
+      HEALTH_CHECK_INTERVAL_MS: 10000
+      NODE_LOST_THRESHOLD_MS: 30000
+      MAX_RESTART_COUNT: 5
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  worker1:
+    build:
+      context: .
+      dockerfile: packages/worker/Dockerfile
+    ports:
+      - "3001:3001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WORKER_PORT: 3001
+      WORKER_HOST: worker1
+      CONTROL_PLANE_URL: http://core:3000
+    depends_on:
+      core:
+        condition: service_healthy
+
+  worker2:
+    build:
+      context: .
+      dockerfile: packages/worker/Dockerfile
+    ports:
+      - "3002:3002"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WORKER_PORT: 3002
+      WORKER_HOST: worker2
+      CONTROL_PLANE_URL: http://core:3000
+    depends_on:
+      core:
+        condition: service_healthy
