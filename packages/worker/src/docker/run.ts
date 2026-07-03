@@ -13,9 +13,28 @@ async function pullImage(image: string): Promise<void> {
   });
 }
 
+async function removeExisting(name: string): Promise<void> {
+  const matches = await docker.listContainers({
+    all: true,
+    filters: { name: [name] },
+  });
+
+  // Docker name filter is a prefix match, so verify the exact name.
+  const exact = matches.find((c) =>
+    c.Names.some((n) => n === `/${name}` || n === name)
+  );
+
+  if (exact) {
+    logger.info(`Removing existing container ${name} (${exact.Id.slice(0, 12)})`);
+    await docker.getContainer(exact.Id).remove({ force: true });
+  }
+}
+
 export async function runContainer(image: string, name: string): Promise<string> {
   logger.info(`Pulling image: ${image}`);
   await pullImage(image);
+
+  await removeExisting(name);
 
   logger.info(`Creating container: ${name}`);
   const container = await docker.createContainer({
