@@ -11,7 +11,7 @@ A lightweight container orchestration system built from scratch. It schedules Do
 └───────────────────────┬─────────────────────────────┘
                         │ HTTP
 ┌───────────────────────▼─────────────────────────────┐
-│              Control Plane  (:3000)                  │
+│              Control Plane  (:3000)                 │
 │                                                     │
 │  ┌─────────────┐  ┌───────────┐  ┌───────────────┐  │
 │  │  Scheduler  │  │ Health    │  │ Worker        │  │
@@ -20,7 +20,7 @@ A lightweight container orchestration system built from scratch. It schedules Do
 │                        │                            │
 │  ┌─────────────────────▼──────────────────────────┐ │
 │  │                  MongoDB                       │ │
-│  │     Nodes · Containers · Events               │ │
+│  │     Nodes · Containers · Events                │ │
 │  └────────────────────────────────────────────────┘ │
 └──────────┬──────────────────┬───────────────────────┘
            │ HTTP             │ HTTP
