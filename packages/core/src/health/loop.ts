@@ -85,6 +85,7 @@ async function runHealthCheck() {
     const dbContainers = await Container.find({
       nodeId: node._id,
       status: 'running',
+      dockerId: { $ne: '' }, // skip containers mid-reschedule
     });
 
     for (const container of dbContainers) {
@@ -108,6 +109,13 @@ async function rescheduleContainer(
   },
   reason: string
 ) {
+
+  // Re-fetch to get latest status, avoid double rescheduling
+  const fresh = await Container.findById(container._id);
+  if (!fresh || fresh.status === 'restarting' || fresh.status === 'pending' || fresh.status === 'dead') {
+    return;
+  }
+
   if (container.restartCount >= config.maxRestartCount) {
     await Container.findByIdAndUpdate(container._id, { status: 'dead' });
     logger.error(`Container ${container.name} exceeded max restarts, marking dead`);
