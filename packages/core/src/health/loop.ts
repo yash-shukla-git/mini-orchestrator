@@ -3,10 +3,10 @@ import { Node } from '../db/models/Node';
 import { Container } from '../db/models/Container';
 import { Event } from '../db/models/Event';
 import { pickNode } from '../scheduler/index';
-import { dispatchRun } from '../scheduler/dispatch';
 import { config } from '../config';
 import { logger } from '../logger';
 import mongoose from 'mongoose';
+import { dispatchRun, dispatchKill } from '../scheduler/dispatch';
 
 interface WorkerHealthContainer {
   dockerId: string;
@@ -103,6 +103,8 @@ async function rescheduleContainer(
     dockerId: string;
     name: string;
     image: string;
+    groupName: string;
+    replicaIndex: number;
     restartCount: number;
     status: string;
     nodeId: mongoose.Types.ObjectId;
@@ -127,13 +129,34 @@ async function rescheduleContainer(
     $inc: { restartCount: 1 },
   });
 
+  // Best-effort cleanup of the old container. For crash_recovery the old node
+  // is still reachable, so this actually removes the orphan. For node_recovery
+  // the node is unreachable by definition, so this will fail silently, that's fine,
+  // the important part is we no longer skip it.
+  if (container.dockerId) {
+    try {
+      const oldNode = await Node.findById(container.nodeId);
+      if (oldNode) {
+        await dispatchKill(oldNode, container.dockerId, container.name);
+      }
+    } catch (err) {
+      logger.warn(`Could not kill stale container ${container.name} (${container.dockerId}) on old node: ${(err as Error).message}`);
+    }
+  }
+
   try {
     const targetNode = await pickNode();
-    await dispatchRun(targetNode, container.image, container.name);
+    // Suffix with the attempt number so a lingering container from a prior
+    // attempt (e.g. still shutting down on a since-dead node) can never
+    // satisfy the name match for this attempt's dispatch.
+    const attempt = container.restartCount + 2;
+    const dispatchName = `${container.groupName}_${container.replicaIndex}-r${attempt}`;
+    await dispatchRun(targetNode, container.image, dispatchName);
 
     // Clear the stale dockerId; the health loop will set the new one once the worker reports it.
     await Container.findByIdAndUpdate(container._id, {
       dockerId: '',
+      name: dispatchName,
       nodeId: targetNode._id,
       status: 'pending',
     });
@@ -142,11 +165,11 @@ async function rescheduleContainer(
       type: 'restarted',
       containerId: container._id,
       nodeId: targetNode._id,
-      message: `Container ${container.name} dispatched for restart on ${targetNode.host}:${targetNode.port}`,
+      message: `Container ${dispatchName} dispatched for restart on ${targetNode.host}:${targetNode.port}`,
       metadata: { reason, image: container.image },
     });
 
-    logger.info(`Container ${container.name} dispatched for restart on ${targetNode.host}:${targetNode.port} (${reason})`);
+    logger.info(`Container ${dispatchName} dispatched for restart on ${targetNode.host}:${targetNode.port} (${reason})`);
   } catch (err) {
     await Container.findByIdAndUpdate(container._id, { status: 'dead' });
     logger.error(`Failed to reschedule ${container.name}: ${(err as Error).message}`);

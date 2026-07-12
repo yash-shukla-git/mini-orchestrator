@@ -17,7 +17,6 @@ export async function handleRegister(req: Request, res: Response) {
       port,
       status: 'active',
       lastHeartbeat: new Date(),
-      containerCount: 0,
     },
     { upsert: true, new: true }
   );
@@ -34,32 +33,25 @@ export async function handleRegister(req: Request, res: Response) {
 }
 
 export async function handleHeartbeat(req: Request, res: Response) {
-  const { nodeId, containerCount, cpuPercent, memoryMB } = req.body as {
-    nodeId: string;
-    containerCount: number;
-    cpuPercent: number;
-    memoryMB: number;
-  };
+    const { nodeId, cpuPercent, memoryMB } = req.body as {
+        nodeId: string;
+        cpuPercent: number;
+        memoryMB: number;
+    };
 
-  if (!nodeId) {
-    return res.status(400).json({ error: 'nodeId is required' });
-  }
+    if (!nodeId) {
+        return res.status(400).json({ error: 'nodeId is required' });
+    }
 
-  const node = await Node.findByIdAndUpdate(
-    nodeId,
-    {
-      lastHeartbeat: new Date(),
-      containerCount,
-      cpuPercent,
-      memoryMB,
-      status: 'active',
-    },
-    { new: true }
-  );
+    const node = await Node.findByIdAndUpdate(
+        nodeId,
+        { lastHeartbeat: new Date(), cpuPercent, memoryMB, status: 'active' },
+        { new: true }
+    );
 
-  if (!node) {
-    return res.status(404).json({ error: 'Node not found' });
-  }
+    if (!node) {
+        return res.status(404).json({ error: 'Node not found' });
+    }
 
-  return res.json({ ok: true });
+    return res.json({ ok: true });
 }

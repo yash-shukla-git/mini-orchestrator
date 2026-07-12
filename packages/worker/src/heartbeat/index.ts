@@ -30,7 +30,6 @@ export function startHeartbeat(nodeId: string) {
         `${config.controlPlaneUrl}/worker/heartbeat`,
         {
           nodeId,
-          containerCount: containers.length,
           cpuPercent: Math.round(totalCpu * 100) / 100,
           memoryMB: Math.round(totalMemory * 100) / 100,
         },

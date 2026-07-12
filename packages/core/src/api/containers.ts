@@ -36,7 +36,7 @@ export async function killContainer(req: Request, res: Response) {
   }
 
   try {
-    await dispatchKill(node, container.dockerId);
+    await dispatchKill(node, container.dockerId, container.name);
   } catch (err) {
     logger.warn(`Could not reach node to kill container ${container.dockerId}, marking stopped anyway`);
   }

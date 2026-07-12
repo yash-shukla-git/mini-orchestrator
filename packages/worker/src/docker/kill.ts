@@ -1,7 +1,7 @@
 import { docker } from './client';
 import { logger } from '../logger';
 
-export async function killContainer(dockerId: string): Promise<void> {
+export async function killContainer(dockerId: string, containerName?: string): Promise<void> {
   const container = docker.getContainer(dockerId);
 
   try {
@@ -19,5 +19,5 @@ export async function killContainer(dockerId: string): Promise<void> {
     if (status !== 404) throw err;
   }
 
-  logger.info(`Removed container ${dockerId.slice(0, 12)}`);
+  logger.info(`Removed ${containerName ?? 'container'} (${dockerId.slice(0, 12)})`);
 }

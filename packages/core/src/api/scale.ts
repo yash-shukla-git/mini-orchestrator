@@ -78,7 +78,7 @@ export async function handleScale(req: Request, res: Response) {
 
     if (node) {
       try {
-        await dispatchKill(node, container.dockerId);
+        await dispatchKill(node, container.dockerId, container.name);
       } catch {
         logger.warn(`Could not reach node to kill ${container.name}, marking stopped`);
       }

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import axios from 'axios';
 import { Node } from '../db/models/Node';
 import { logger } from '../logger';
+import { getContainerLoadMap } from '../scheduler/index';
 
 interface WorkerStats {
   dockerId: string;
@@ -11,6 +12,7 @@ interface WorkerStats {
 
 export async function getMetrics(req: Request, res: Response) {
   const activeNodes = await Node.find({ status: 'active' });
+  const loadMap = await getContainerLoadMap(activeNodes.map((n) => n._id));
 
   const results = await Promise.all(
     activeNodes.map(async (node) => {
@@ -24,7 +26,7 @@ export async function getMetrics(req: Request, res: Response) {
           nodeId: node._id,
           host: node.host,
           port: node.port,
-          containerCount: node.containerCount,
+          containerCount: loadMap.get(String(node._id)) ?? 0,
           cpuPercent: node.cpuPercent,
           memoryMB: node.memoryMB,
           containers: response.data.stats,
@@ -35,7 +37,7 @@ export async function getMetrics(req: Request, res: Response) {
           nodeId: node._id,
           host: node.host,
           port: node.port,
-          containerCount: node.containerCount,
+          containerCount: loadMap.get(String(node._id)) ?? 0,
           cpuPercent: node.cpuPercent,
           memoryMB: node.memoryMB,
           containers: [],
