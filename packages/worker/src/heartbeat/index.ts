@@ -3,6 +3,7 @@ import { docker } from '../docker/client';
 import { config } from '../config';
 import { logger } from '../logger';
 import { getContainerStats } from '../docker/stats';
+import { ownContainerFilter } from '../docker/labels';
 
 const HEARTBEAT_INTERVAL_MS = 10_000;
 
@@ -11,19 +12,21 @@ export function startHeartbeat(nodeId: string) {
 
   setInterval(async () => {
     try {
-      const containers = await docker.listContainers({ all: false });
+      const containers = await docker.listContainers({ all: false, filters: ownContainerFilter() });
+
+      const allStats = await Promise.all(
+        containers.map((c) =>
+          getContainerStats(c.Id).catch(() => null) // skip containers that aren't responding to stats
+        )
+      );
 
       let totalCpu = 0;
       let totalMemory = 0;
 
-      for (const c of containers) {
-        try {
-          const stats = await getContainerStats(c.Id);
-          totalCpu += stats.cpuPercent;
-          totalMemory += stats.memoryMB;
-        } catch {
-          // skip containers that aren't responding to stats
-        }
+      for (const stats of allStats) {
+        if (!stats) continue;
+        totalCpu += stats.cpuPercent;
+        totalMemory += stats.memoryMB;
       }
 
       await axios.post(

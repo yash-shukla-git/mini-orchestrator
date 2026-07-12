@@ -171,8 +171,18 @@ async function rescheduleContainer(
 
     logger.info(`Container ${dispatchName} dispatched for restart on ${targetNode.host}:${targetNode.port} (${reason})`);
   } catch (err) {
-    await Container.findByIdAndUpdate(container._id, { status: 'dead' });
-    logger.error(`Failed to reschedule ${container.name}: ${(err as Error).message}`);
+    // A dispatch failure (e.g. a worker mid-restart, a transient network blip)
+    // shouldn't permanently kill the container while restart budget remains —
+    // revert to 'running' so the next health check's crash/node-recovery
+    // detection (dockerId/nodeId are untouched above) picks it up and retries.
+    const exhausted = container.restartCount + 1 >= config.maxRestartCount;
+    await Container.findByIdAndUpdate(container._id, { status: exhausted ? 'dead' : 'running' });
+
+    if (exhausted) {
+      logger.error(`Failed to reschedule ${container.name} and exceeded max restarts, marking dead: ${(err as Error).message}`);
+    } else {
+      logger.warn(`Failed to reschedule ${container.name}, will retry next health check: ${(err as Error).message}`);
+    }
   }
 }
 

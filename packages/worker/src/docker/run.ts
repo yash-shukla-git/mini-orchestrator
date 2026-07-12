@@ -1,5 +1,6 @@
 import { docker } from './client';
 import { logger } from '../logger';
+import { ownContainerLabels } from './labels';
 
 async function pullImage(image: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -40,6 +41,7 @@ export async function runContainer(image: string, name: string): Promise<string>
   const container = await docker.createContainer({
     Image: image,
     name,
+    Labels: ownContainerLabels(),
     HostConfig: {
       // Keep the container around after it exits so the health loop can detect the stopped state
       AutoRemove: false,

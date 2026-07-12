@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import { docker } from '../docker/client';
 import { getContainerStats } from '../docker/stats';
+import { ownContainerFilter } from '../docker/labels';
 import { logger } from '../logger';
 
 export async function handleStats(_req: Request, res: Response) {
-  const containers = await docker.listContainers({ all: false });
+  const containers = await docker.listContainers({ all: false, filters: ownContainerFilter() });
 
   const results = await Promise.all(
     containers.map(async (c) => {

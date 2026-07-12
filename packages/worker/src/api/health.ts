@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { docker } from '../docker/client';
+import { ownContainerFilter } from '../docker/labels';
 
 let nodeId: string | null = null;
 
@@ -8,7 +9,7 @@ export function setNodeId(id: string) {
 }
 
 export async function handleHealth(_req: Request, res: Response) {
-  const containers = await docker.listContainers({ all: true });
+  const containers = await docker.listContainers({ all: true, filters: ownContainerFilter() });
 
   return res.json({
     nodeId,
