@@ -26,7 +26,10 @@ async function runHealthCheck() {
   const staleNodes = await Node.find({ status: 'active', lastHeartbeat: { $lt: threshold } });
 
   for (const node of staleNodes) {
-    await Node.findByIdAndUpdate(node._id, { status: 'lost' });
+    // Once lost, the last heartbeat's memoryMB is stale and no longer
+    // trustworthy (its containers are about to be reassigned elsewhere) —
+    // reset it rather than displaying a frozen, no-longer-true reading.
+    await Node.findByIdAndUpdate(node._id, { status: 'lost', memoryMB: 0 });
     await Event.create({
       type: 'node_lost',
       nodeId: node._id,
@@ -70,6 +73,26 @@ async function runHealthCheck() {
     const runningDockerIds = new Set(runningContainers.map((c) => c.dockerId));
     // Index by name so pending containers can be confirmed by name (no dockerId yet).
     const runningByName = new Map(runningContainers.map((c) => [c.name, c.dockerId]));
+
+    // Reap containers physically running on this node that the DB no longer
+    // tracks here — e.g. leftovers from a node_recovery reschedule whose
+    // best-effort kill couldn't reach this node while it was lost, only
+    // discovered once it reconnects.
+    const expectedContainers = await Container.find({
+      nodeId: node._id,
+      status: { $in: ['pending', 'running', 'restarting'] },
+    });
+    const expectedNames = new Set(expectedContainers.map((c) => c.name));
+
+    for (const rc of runningContainers) {
+      if (expectedNames.has(rc.name)) continue;
+      logger.warn(`Reaping orphaned container ${rc.name} (${rc.dockerId.slice(0, 12)}) on ${node.host}:${node.port} — not tracked for this node`);
+      try {
+        await dispatchKill(node, rc.dockerId, rc.name);
+      } catch (err) {
+        logger.warn(`Could not reap ${rc.name}: ${(err as Error).message}`);
+      }
+    }
 
     // Promote pending containers to running once the worker reports them.
     const pendingContainers = await Container.find({ nodeId: node._id, status: 'pending' });
