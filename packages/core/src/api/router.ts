@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { handleDeploy } from './deploy';
-import { listContainers, killContainer } from './containers';
+import { listContainers, killContainer, pruneContainers } from './containers';
 import { handleScale } from './scale';
 import { listNodes } from './nodes';
 import { getMetrics } from './metrics';
@@ -11,6 +11,7 @@ const router = Router();
 
 router.post('/deploy', handleDeploy);
 router.get('/containers', listContainers);
+router.post('/containers/prune', pruneContainers);
 router.delete('/container/:id', killContainer);
 router.post('/scale', handleScale);
 router.get('/nodes', listNodes);

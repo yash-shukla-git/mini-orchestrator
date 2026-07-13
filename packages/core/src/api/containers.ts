@@ -18,6 +18,18 @@ export async function listContainers(req: Request, res: Response) {
   return res.json({ containers });
 }
 
+export async function pruneContainers(req: Request, res: Response) {
+  const toRemove = await Container.find({ status: { $in: ['dead', 'stopped'] } });
+
+  if (toRemove.length === 0) {
+    return res.json({ removed: 0, names: [] });
+  }
+
+  await Container.deleteMany({ _id: { $in: toRemove.map((c) => c._id) } });
+
+  return res.json({ removed: toRemove.length, names: toRemove.map((c) => c.name) });
+}
+
 export async function killContainer(req: Request, res: Response) {
   const { id } = req.params;
 
