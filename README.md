@@ -7,7 +7,7 @@ A lightweight container orchestration system built from scratch. It schedules Do
 ```
 ┌─────────────────────────────────────────────────────┐
 │                      CLI                            │
-│   deploy / ps / scale / kill / logs / nodes         │
+│   deploy / ps / scale / kill / prune / logs / nodes │
 └───────────────────────┬─────────────────────────────┘
                         │ HTTP
 ┌───────────────────────▼─────────────────────────────┐
@@ -34,13 +34,14 @@ A lightweight container orchestration system built from scratch. It schedules Do
 
 ## How it works
 
-1. **Workers register** with the control plane on startup and send a heartbeat every 10 seconds with their container count and resource usage.
+1. **Workers register** with the control plane on startup and send a heartbeat every 10 seconds with their memory usage. Container counts and load are computed live from MongoDB at read/schedule time, never cached on the worker.
 2. **Deploy** picks the worker with the fewest running containers (bin-packing), sends a fire-and-forget dispatch, and records the container as `pending` in MongoDB. No waiting for image pulls.
 3. **Health loop** runs every 10 seconds on the control plane:
    - Promotes `pending` containers to `running` once the worker reports them by name.
    - Detects workers that stopped heartbeating and marks them `lost`.
    - Reschedules orphaned containers from lost nodes onto healthy ones.
    - Detects crashed containers on active nodes and restarts them (up to `MAX_RESTART_COUNT`).
+   - Reaps containers still physically running on a node that the database no longer tracks there — e.g. leftovers from a reschedule whose kill couldn't reach the node while it was down, discovered once it reconnects.
 
 ## Getting started
 
@@ -63,7 +64,7 @@ cp .env.example .env
 
 ### Running locally
 
-Open three terminals:
+Open a few terminals:
 
 ```bash
 # Terminal 1 — control plane
@@ -74,13 +75,16 @@ npm run dev:worker
 
 # Terminal 3 — second worker (optional)
 WORKER_PORT=3002 npm run dev:worker
+
+# Terminal 4 — third worker (optional)
+WORKER_PORT=3003 npm run dev:worker
 ```
 
 The control plane boots, connects to MongoDB, and starts the health loop. Workers register themselves automatically on startup.
 
 ![Control plane startup and health loop in action](./docs/control-plane-logs.png)
 
-*The logs show two workers registering, a node going offline (`marked as lost`), and a container being automatically rescheduled to the surviving worker (`node_recovery`).*
+*The logs show three workers registering, four containers being dispatched across them, and each one being confirmed `running` once the health loop sees it reported by name.*
 
 ## CLI usage
 
@@ -97,6 +101,9 @@ npx tsx packages/cli/src/index.ts scale --name myapp --replicas 4
 # Kill a container by ID
 npx tsx packages/cli/src/index.ts kill <container-id>
 
+# Remove stopped/dead containers from the list
+npx tsx packages/cli/src/index.ts prune
+
 # Tail live logs
 npx tsx packages/cli/src/index.ts logs <container-id>
 
@@ -104,9 +111,13 @@ npx tsx packages/cli/src/index.ts logs <container-id>
 npx tsx packages/cli/src/index.ts nodes
 ```
 
-![ps and nodes output](./docs/cli-demo.png)
+![ps output](./docs/ps-demo.png)
 
-*`ps` shows container status across nodes — `pending` means the image is still being pulled, `running` means the health loop has confirmed it. `nodes` shows live CPU, memory, and container counts per worker.*
+*`ps` shows container status across nodes — `pending` means the image is still being pulled, `running` means the health loop has confirmed it by name. Stopped and dead containers stick around here until you `prune` them.*
+
+![nodes output](./docs/nodes-demo.png)
+
+*`nodes` shows live container counts and memory usage per worker, computed straight from MongoDB and each worker's own Docker stats rather than a cached, worker-reported value.*
 
 ### CLI options
 
@@ -116,6 +127,7 @@ npx tsx packages/cli/src/index.ts nodes
 | `ps` | `--status`, `--group` | List containers (filterable) |
 | `scale` | `--name`, `--replicas` | Scale a group up or down |
 | `kill` | `<id>` | Stop and remove a container |
+| `prune` | — | Remove stopped/dead containers from the list |
 | `logs` | `<id>` | Stream live container logs |
 | `nodes` | — | List worker nodes and their load |
 
@@ -153,19 +165,19 @@ This starts one control plane and two workers. Workers wait for the control plan
 packages/
   core/       Control plane (Express + Mongoose)
     src/
-      api/          REST handlers (deploy, scale, kill, logs, metrics, nodes)
+      api/          REST handlers (deploy, containers/prune, scale, logs, metrics, nodes)
       db/models/    Mongoose schemas (Container, Node, Event)
-      scheduler/    Node picker + HTTP dispatch to workers
-      health/       Health loop (crash recovery, node recovery)
+      scheduler/    Node picker + HTTP dispatch to workers (pickNode, dispatchRun/dispatchKill)
+      health/       Health loop (crash recovery, node recovery, orphan reaping)
       worker-registry/  Heartbeat + registration handlers
 
   worker/     Worker node (Express + Dockerode)
     src/
       api/          REST handlers (run, kill, logs, stats, health)
-      docker/       Dockerode wrappers (pull, run, kill, stats)
+      docker/       Dockerode wrappers (pull, run, kill, stats) + per-worker container labeling
       heartbeat/    Periodic heartbeat to control plane
 
   cli/        Command-line interface (Commander + Chalk)
     src/
-      commands/     deploy, ps, kill, scale, nodes, logs
+      commands/     deploy, ps, kill, prune, scale, nodes, logs
 ```
