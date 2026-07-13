@@ -10,7 +10,6 @@ interface WorkerNode {
   port: number;
   status: string;
   containerCount: number;
-  cpuPercent: number;
   memoryMB: number;
   lastHeartbeat: string;
 }
@@ -31,7 +30,7 @@ export const nodesCommand = new Command('nodes')
       }
 
       const table = new Table({
-        head: ['ID', 'Host', 'Port', 'Status', 'Containers', 'CPU %', 'Memory (MB)', 'Last Seen'],
+        head: ['ID', 'Host', 'Port', 'Status', 'Containers', 'Memory (MB)', 'Last Seen'],
         style: { head: ['cyan'] },
       });
 
@@ -44,7 +43,6 @@ export const nodesCommand = new Command('nodes')
           n.port,
           statusColor(n.status),
           n.containerCount,
-          n.cpuPercent.toFixed(1),
           n.memoryMB.toFixed(1),
           lastSeen,
         ]);

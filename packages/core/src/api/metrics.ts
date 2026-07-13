@@ -6,7 +6,6 @@ import { getContainerLoadMap } from '../scheduler/index';
 
 interface WorkerStats {
   dockerId: string;
-  cpuPercent: number;
   memoryMB: number;
 }
 
@@ -27,7 +26,6 @@ export async function getMetrics(req: Request, res: Response) {
           host: node.host,
           port: node.port,
           containerCount: loadMap.get(String(node._id)) ?? 0,
-          cpuPercent: node.cpuPercent,
           memoryMB: node.memoryMB,
           containers: response.data.stats,
         };
@@ -38,7 +36,6 @@ export async function getMetrics(req: Request, res: Response) {
           host: node.host,
           port: node.port,
           containerCount: loadMap.get(String(node._id)) ?? 0,
-          cpuPercent: node.cpuPercent,
           memoryMB: node.memoryMB,
           containers: [],
           error: 'unreachable',

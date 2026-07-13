@@ -13,7 +13,7 @@ export async function handleStats(_req: Request, res: Response) {
         return await getContainerStats(c.Id);
       } catch (err) {
         logger.warn(`Stats unavailable for ${c.Id.slice(0, 12)}: ${(err as Error).message}`);
-        return { dockerId: c.Id, cpuPercent: 0, memoryMB: 0 };
+        return { dockerId: c.Id, memoryMB: 0 };
       }
     })
   );

@@ -20,12 +20,10 @@ export function startHeartbeat(nodeId: string) {
         )
       );
 
-      let totalCpu = 0;
       let totalMemory = 0;
 
       for (const stats of allStats) {
         if (!stats) continue;
-        totalCpu += stats.cpuPercent;
         totalMemory += stats.memoryMB;
       }
 
@@ -33,7 +31,6 @@ export function startHeartbeat(nodeId: string) {
         `${config.controlPlaneUrl}/worker/heartbeat`,
         {
           nodeId,
-          cpuPercent: Math.round(totalCpu * 100) / 100,
           memoryMB: Math.round(totalMemory * 100) / 100,
         },
         { timeout: 5_000 }

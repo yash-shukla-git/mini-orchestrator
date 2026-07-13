@@ -5,7 +5,6 @@ export interface INode extends Document {
   host: string;
   status: 'active' | 'lost';
   lastHeartbeat: Date;
-  cpuPercent: number;
   memoryMB: number;
   registeredAt: Date;
 }
@@ -15,7 +14,6 @@ const NodeSchema = new Schema<INode>({
   host: { type: String, required: true },
   status: { type: String, enum: ['active', 'lost'], default: 'active' },
   lastHeartbeat: { type: Date, default: Date.now },
-  cpuPercent: { type: Number, default: 0 },
   memoryMB: { type: Number, default: 0 },
   registeredAt: { type: Date, default: Date.now },
 });

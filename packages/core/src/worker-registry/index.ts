@@ -33,9 +33,8 @@ export async function handleRegister(req: Request, res: Response) {
 }
 
 export async function handleHeartbeat(req: Request, res: Response) {
-    const { nodeId, cpuPercent, memoryMB } = req.body as {
+    const { nodeId, memoryMB } = req.body as {
         nodeId: string;
-        cpuPercent: number;
         memoryMB: number;
     };
 
@@ -45,7 +44,7 @@ export async function handleHeartbeat(req: Request, res: Response) {
 
     const node = await Node.findByIdAndUpdate(
         nodeId,
-        { lastHeartbeat: new Date(), cpuPercent, memoryMB, status: 'active' },
+        { lastHeartbeat: new Date(), memoryMB, status: 'active' },
         { new: true }
     );
 
